@@ -114,8 +114,23 @@ namespace TMAS
                     }
                     else 
                     {
-                        // T msg = 
+                        T msg = TMASTools.DeSerialize<T>(pack.bodyBuffer);
+                        ONReceiveMsg(msg);
+
+                        pack.ResetData();
+                        m_Skt.BeginReceive(
+                            pack.headBuffer,
+                            0,
+                            pack.headLen,
+                            SocketFlags.None,
+                            new AsyncCallback(ReceiveHeadData),
+                            pack
+                        );
                     }
+                }else 
+                {
+                    OnDisConnected();
+                    Clear();
                 }
             }
             catch (System.Exception)
@@ -126,6 +141,50 @@ namespace TMAS
         }
 
         #endregion
+
+
+        public void SendMsg(T msg)
+        {
+            byte[] data = TMASTools.PackLenInfo(TMASTools.Serialize<T>(msg));
+
+            SendMsg(data);
+        }
+
+        public void SendMsg(byte[] data) 
+        {
+            NetworkStream ns = null;
+            try
+            {
+                ns = new NetworkStream(m_Skt);
+                if (ns.CanWrite) 
+                {
+                    ns.BeginWrite(
+                        data, 0, data.Length, new AsyncCallback(SendCB), ns
+                    );
+                }
+            }
+            catch (System.Exception)
+            {
+                
+                throw;
+            }
+        }
+
+        private void SendCB(IAsyncResult ar) 
+        {
+            NetworkStream ns = (NetworkStream)ar.AsyncState;
+            try
+            {
+                ns.EndWrite();
+                ns.Flush();
+                ns.Close();
+            }
+            catch (System.Exception)
+            {
+                
+                throw;
+            }
+        }
 
 
         protected void Clear() 
