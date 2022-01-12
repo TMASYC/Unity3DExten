@@ -26,9 +26,11 @@ Material:
     - _Size: 0.1
     - _Spec: 10
     - _SpecularGlass: 32
+    - _SpecularPow: 30
     m_Colors:
     - _AtmoColor: {r: 0, g: 0.4, b: 1, a: 1}
     - _Diffuse: {r: 1, g: 1, b: 1, a: 1}
+    - _MainCol: {r: 1, g: 1, b: 1, a: 1}
     - _ObjColor: {r: 1, g: 1, b: 1, a: 1}
     - _RimColor: {r: 1, g: 1, b: 1, a: 1}
     - _SpecColor: {r: 1, g: 1, b: 1, a: 1}

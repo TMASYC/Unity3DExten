@@ -1,142 +1,76 @@
-﻿Shader "Unlit/L05_Phong"
+﻿Shader "AP01/L05/OldSchool"
 {
     Properties
     {
-        _Spec ("Specualr", Range(1, 10)) = 1
-        _Diffuse ("Diffuse", Color) = (1, 1, 1, 1)
-        _SpecularColor ("SpecColor", Color) = (1, 1, 1, 1)
-        
-        _SpecularGlass ("SpecularGlassStrength", Range(0, 64)) = 32
-        _ObjColor ("ObjColor", color) = (1, 1, 1, 1)
-        _RimColor ("RimColor", color) = (1, 1, 1, 1)
-        _RimStrength ("RimStrength", Range(0.0001, 3.0)) = 0.1
-        
-        _AtmoColor ("Atmosphere Color", Color) = (0, 0.4, 1.0, 1)
-        _Size ("Size", Float) = 0.1
-        _OutLightPow ("LightPow", Float) = 5
-        _OutLightStrength ("Strength", Float) = 15
+        _MainCol ("颜色", color) = (1.0, 1.0, 1.0, 1.0)
+        _SpecularPow ("高光次幂", range(1, 90)) = 30
     }
     SubShader
     {
         Tags { "RenderType" = "Opaque" }
-        LOD 100
-        
         Pass
         {
-            CGPROGRAM
+            Name "FORWARD"
+            Tags { "LightMode" = "ForwardBase" }
             
-            #pragma vertex vert
-            #pragma fragment frag
-            
-            
-            #include "UnityCG.cginc"
-            #include "Lighting.cginc"
-            struct appdata
-            {
-                float4 vertex: POSITION;
-                float3 normal: NORMAL;
-            };
-            
-            struct v2f
-            {
-                float4 vertex: SV_POSITION;
-                float3 ndir: TEXCOORD0;
-                float3 worldPos: TEXCOORD1;
-            };
-            
-            //uniform 共享于vert,frag
-            //attibute 仅用于vert
-            //varying 用于vert frag传數據
-            
-            uniform float _Spec;
-            uniform float3 _Diffuse;
-            uniform float3 _SpecularColor;
-            
-            v2f vert(appdata v)
-            {
-                v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.ndir = UnityObjectToWorldNormal(v.normal);
-                o.worldPos = mul(unity_ObjectToWorld, v.vertex);
-                return o;
-            }
-            
-            fixed4 frag(v2f i): SV_Target
-            {
-                fixed3 nor = normalize(i.ndir);
-                fixed3 lightdir = normalize(_WorldSpaceLightPos0.xyz);
-                
-                //fixed lambert = max(0.0, dot(nor, lightdir));
-                fixed ndotl = dot(nor, lightdir);
-                fixed halfLambert = ndotl * 0.5 + 0.5;
-                
-                fixed3 ambient = UNITY_LIGHTMODEL_AMBIENT.xyz;
-                
-                fixed3 diffuse = _LightColor0.xyz * _Diffuse.xyz * halfLambert;
-                
-                fixed3 viewDir = normalize(_WorldSpaceCameraPos - i.worldPos.xyz);// - //normalize(UnityWorldSpaceViewDir(i.vertex.xyz));
-                
-                fixed3 reflectDir = normalize(reflect(-lightdir, nor));
-                
-                fixed3 spec = _LightColor0.rgb * _SpecularColor.rgb * pow(saturate(dot(viewDir, reflectDir)), _Spec);
-                
-                
-                return fixed4(spec, 0);
-            }
-            ENDCG
-            
-        }
-        
-        Pass  //pass2 实现OutLight
-        {
-            Name "AtmosphereBase"
-            Tags { "LightMode" = "Always" }
-            
-            Cull Front
-            Blend SrcAlpha One
             
             CGPROGRAM
             
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
-            
-            uniform float _Size;
-            uniform float4 _AtmoColor;
-            uniform float _OutLightPow;
-            uniform float _OutLightStrength;
-            
-            struct v2f
+            #pragma multi_compile_fwdbase_fullshadows
+            #pragma target 3.0
+            // 输入参数
+            // 修饰字（满足小朋友太多的问好, 想保发量的大家看热闹）
+            // uniform  共享于vert,frag
+            // attibute 仅用于vert
+            // varying  用于vert,frag传数据
+            uniform float3 _MainCol;     // RGB够了 float3
+            uniform float _SpecularPow;  // 标量 float
+            // 输入结构
+            struct VertexInput
             {
-                float3 normal: TEXCOORD0;
-                float3 worldPos: TEXCOORD1;
-                float4 vertex: SV_POSITION;
+                float4 vertex: POSITION;   // 顶点信息 Get✔
+                float4 normal: NORMAL;     // 法线信息 Get✔
             };
-            
-            v2f vert(appdata_base v)
+            // 输出结构
+            struct VertexOutput
             {
-                v2f o;
-                v.vertex.xyz += v.normal * _Size;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.normal = v.normal;
-                o.worldPos = mul(unity_ObjectToWorld, v.vertex);
-                return o;
+                float4 posCS: SV_POSITION;     // 裁剪空间（暂理解为屏幕空间吧）顶点位置
+                float4 posWS: TEXCOORD0;       // 世界空间顶点位置
+                float3 nDirWS: TEXCOORD1;      // 世界空间法线方向
+            };
+            // 输入结构>>>顶点Shader>>>输出结构
+            VertexOutput vert(VertexInput v)
+            {
+                VertexOutput o = (VertexOutput)0;                   // 新建输出结构
+                o.posCS = UnityObjectToClipPos(v.vertex);     // 变换顶点位置 OS>CS
+                o.posWS = mul(unity_ObjectToWorld, v.vertex);   // 变换顶点位置 OS>WS
+                o.nDirWS = UnityObjectToWorldNormal(v.normal);  // 变换法线方向 OS>WS
+                return o;                                           // 返回输出结构
             }
-            
-            fixed4 frag(v2f i): COLOR
+            // 输出结构>>>像素
+            float4 frag(VertexOutput i): COLOR
             {
-                i.normal = normalize(i.normal);
-                //视角观察方向
-                float3 viewDir = normalize(i.worldPos - _WorldSpaceCameraPos.xyz);
-                
-                float4 color = _AtmoColor;
-                
-                color.a = pow(saturate(dot(viewDir, i.normal)), _OutLightPow);
-                color.a *= _OutLightStrength * dot(viewDir, i.normal);
-                return color;
+                // 准备向量
+                float3 nDir = normalize(i.nDirWS);
+                float3 lDir = _WorldSpaceLightPos0.xyz;
+                float3 vDir = normalize(_WorldSpaceCameraPos.xyz - i.posWS.xyz);
+                float3 hDir = normalize(vDir + lDir);
+                // 准备点积结果
+                float ndotl = dot(nDir, lDir);
+                float ndoth = dot(nDir, hDir);
+                // 光照模型
+                float lambert = max(0.0, ndotl);
+                float blinnPhong = pow(max(0.0, ndoth), _SpecularPow);
+                float3 finalRGB = _MainCol * lambert + blinnPhong;
+                // 返回结果
+                return float4(finalRGB, 1.0);
             }
             ENDCG
             
         }
     }
+    FallBack "Diffuse"
 }
